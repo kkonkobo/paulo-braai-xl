@@ -52,10 +52,10 @@ export const DIM = {
   sideT: 40,            // hollow end columns
   floorTop: 676,        // top of floor firebricks
   clearZ: 329,          // half the clear depth between front and back brick faces
-  rails: [830, 890, 950],            // ledge heights (front + back walls)
+  rails: [746, 796, 846, 896, 946],  // the five notch heights a cooking surface can sit at
   legX: 700, legZ: 320,
   wheelR: 148,
-  half: { w: 685, d: 640, cx: 347 }, // half-length attachments and their centre
+  half: { w: 646, d: 640, cx: 345, pinX: 200 }, // half-length attachments, their centre, support pins
   spitZ: [-165, 165], spitY: 1076,
   lid: { H: 260, skirt: 150, run: 170 },
   rimY: 1006, hingeZ: -375,
@@ -108,8 +108,8 @@ function cart(M) {
   }
   // hook for the ash shovel, and a tool rail on the left end wall
   B.add('frame', bentRod([V(-600, yTop - 20, lz + 20), V(-600, yTop - 50, lz + 20), V(-600, yTop - 65, lz + 40), V(-600, yTop - 45, lz + 52)], 4));
-  B.add('frame', rod(V(x0 - 45, 930, -335), V(x0 - 45, 930, -65), 7));
-  for (const z of [-332, -70]) B.add('frame', bmm(x0 - 50, x0, 925, 935, z - 3, z + 3));
+  B.add('frame', rod(V(x0 - 45, 930, -285), V(x0 - 45, 930, -65), 7));
+  for (const z of [-282, -70]) B.add('frame', bmm(x0 - 50, x0, 925, 935, z - 3, z + 3));
   return B.build(M);
 }
 
@@ -150,16 +150,32 @@ function braaiBox(M) {
   brickWall(B, 2 * inX, top - ft, mx(TR(0, ft, z1 - t, 0, PI, 0)));                                          // front
   for (const sgn of [-1, 1]) brickWall(B, 2 * cz, top - ft, mx(TR(sgn * inX, ft, 0, 0, -sgn * PI / 2, 0))); // ends
 
-  // ledge rails at three heights along the front and back walls: anything half-length
-  // drops in anywhere along the braai
-  for (const s of [-1, 1]) {
-    for (const x of [-600, -200, 200, 600]) B.add('zinc', bmm(x - 15, x + 15, 800, top - 8, s * cz, s * (cz - 5)));
-    for (const y of DIM.rails) {
-      B.add('zinc', bmm(-690, 690, y - 4, y, s * cz, s * (cz - 24)));
-      B.add('zinc', bmm(-690, 690, y - 20, y, s * (cz - 5), s * (cz - 9)));
-    }
+  // sockets for the removable upper shelf, outside the back corners
+  for (const sgn of [-1, 1]) B.add('frame', bmm(sgn * 760, sgn * 812, 770, top, -357, -303));
+
+  // Height adjustment with no moving parts: notched comb plates on the front and back
+  // walls. A surface's four pins drop down the open channel, then the surface slides
+  // 26 mm sideways so the pins sit in the notches at the chosen height.
+  for (const hs of [-1, 1]) for (const px of [-1, 1]) for (const zs of [-1, 1]) {
+    const g = new THREE.ExtrudeGeometry(combShape(hs), { depth: 6, bevelEnabled: false });
+    g.translate(hs * DIM.half.cx + px * DIM.half.pinX, COMB.y0, zs > 0 ? cz - 6 : -cz);
+    B.add('zinc', g);
   }
   return B.build(M);
+}
+
+const COMB = { y0: 726, h: 266 };
+function combShape(hs) {
+  // x = 0 is where a seated pin rests; the channel is 26 mm toward the end wall
+  const pts = [[-22, 0], [48, 0], [48, COMB.h], [34, COMB.h]];
+  const notch = DIM.rails.map((y) => y + 4 - COMB.y0);
+  pts.push([34, notch[0]]);
+  notch.forEach((n, i) => {
+    pts.push([-8, n], [-8, n + 16], [18, n + 16]);
+    pts.push([18, i < notch.length - 1 ? notch[i + 1] : COMB.h]);
+  });
+  pts.push([-22, COMB.h]);
+  return new THREE.Shape((hs < 0 ? pts.map(([x, y]) => [-x, y]).reverse() : pts).map(([x, y]) => new THREE.Vector2(x, y)));
 }
 
 function airVents(M) {
@@ -438,6 +454,11 @@ function halfFrame(B, mat, hgt = 25) {
     B.add(mat, bmm(-w / 2, w / 2, 0, hgt, s * d / 2, s * (d / 2 - 5)));
     B.add(mat, bmm(s * w / 2, s * (w / 2 - 5), 0, hgt, -d / 2, d / 2));
   }
+  supportPins(B);
+}
+function supportPins(B) {
+  const { d, pinX } = DIM.half;
+  for (const x of [-pinX, pinX]) for (const s of [-1, 1]) B.add('stainless', rod(V(x, 10, s * (d / 2 - 4)), V(x, 10, s * (d / 2 + 7)), 6));
 }
 function liftHandles(B, mat, y, zs, half = 70) {
   for (const z of zs) B.add(mat, bentRod([V(-half, y, z), V(-half, y + 48, z), V(half, y + 48, z), V(half, y, z)], 6));
@@ -474,6 +495,7 @@ function plancha(M) {
   const B = new Part('Plancha (half length)');
   const { w, d } = DIM.half;
   for (const s of [-1, 1]) B.add('plate', bmm(-w / 2, w / 2, 0, 12, s * d / 2, s * (d / 2 - 30)));
+  supportPins(B);
   B.add('plate', bmm(-w / 2, w / 2, 12, 22, -d / 2, d / 2 - 46));           // 10 mm cooking plate
   B.add('plate', bmm(-w / 2, w / 2, 22, 58, -d / 2, -d / 2 + 5));           // back splash
   for (const s of [-1, 1]) B.add('plate', bmm(s * w / 2, s * (w / 2 - 5), 22, 44, -d / 2, d / 2 - 46));
@@ -491,6 +513,7 @@ function sandwichPress(M) {
   const { w, d } = DIM.half;
   const B = new Part('Sandwich press: ribbed base plate');
   for (const s of [-1, 1]) B.add('plate', bmm(-w / 2, w / 2, 0, 12, s * d / 2, s * (d / 2 - 30)));
+  supportPins(B);
   B.add('plate', bmm(-w / 2, w / 2, 12, 22, -d / 2, d / 2));
   for (let x = -w / 2 + 60; x <= w / 2 - 60; x += 28) B.add('plate', bmm(x - 3, x + 3, 22, 26, -d / 2 + 75, d / 2 - 95));
   for (const s of [-1, 1]) B.add('plate', bmm(s * (w / 2 - 50), s * (w / 2 - 62), 22, 46, -d / 2 + 32, -d / 2 + 58));
@@ -544,6 +567,20 @@ function rotisserie(M, i) {
   return grp;
 }
 
+function upperShelf(M) {
+  // Lift-off shelf: two posts drop into the sockets outside the back corners. It sits just
+  // in front of the open lids, so it comes off before a lid is closed.
+  const B = new Part('Upper shelf (lifts off)');
+  const y = 1330;
+  for (const sgn of [-1, 1]) B.add('frame', sq(V(sgn * 786, 785, -330), V(sgn * 786, y - 4, -330), 40));
+  B.add('frame', sq(V(-806, y - 20, -330), V(806, y - 20, -330), 40, 40));
+  const p = meshPanel(1612, 210, { bar: 22, barT: 5 });
+  B.add('frame', p.frame.translate(0, y, -255));
+  B.add('frame', p.mesh.translate(0, y, -255));
+  B.add('frame', rebar(V(-806, y + 4, -146), V(806, y + 4, -146), 6));
+  return B.build(M);
+}
+
 function poker(M) {
   const B = new Part('Rebar poker (moves the firebox)');
   const ring = new THREE.TorusGeometry(18, 4.5, 6, 16); ring.translate(0, -16, 0);
@@ -559,13 +596,13 @@ function poker(M) {
   B.add('frame', rebar(V(0, -170, 0), V(0, -720, 0), 6, 9));
   B.add('frame', bentRod([V(0, -720, 0), V(0, -760, 0), V(0, -778, -38), V(0, -748, -55)], 6));
   const g = B.build(M);
-  g.position.set(DIM.box.x0 - 45, 930, -300);
+  g.position.set(DIM.box.x0 - 45, 930, -265);
   return g;
 }
 
 function toolHooks(M) {
   const B = new Part('Tool hooks (S-hooks)');
-  [-235, -205, -175, -145, -115].forEach((z, i) => {
+  [-225, -195, -165, -135, -105].forEach((z, i) => {
     const g = sHook(0, 0, 0, 125 + (i % 2) * 22);
     g.rotateY(PI / 2); g.translate(DIM.box.x0 - 45, 930, z);
     B.add('zinc', g);
@@ -662,10 +699,12 @@ export const SURFACES = [
   { key: 'plancha', label: 'Plancha' },
   { key: 'press', label: 'Sandwich press' },
 ];
-export const LEVELS = ['Low', 'Middle', 'High'];
+// label = height of the cooking surface above the brick floor the coals lie on
+export const LEVELS = DIM.rails.map((y, i) => `${y + 22 - DIM.floorTop} mm${i === 0 ? ' (closest)' : ''}`);
 
 export const ACCESSORIES = [
   { key: 'lids', label: 'Brick-insulated oven lids' },
+  { key: 'shelf', label: 'Upper shelf (lifts off)' },
   { key: 'firebox', label: 'Mobile firebox (sled)' },
   { key: 'rot1', label: 'Rotisserie 1 (back)' },
   { key: 'rot2', label: 'Rotisserie 2 (front)' },
@@ -683,15 +722,16 @@ export const ACCESSORIES = [
   { key: 'cover', label: 'Waterproof cover' },
 ];
 
-const BASE = ['lids', 'firebox', 'boom', 'table', 'cage', 'storedGrids', 'poker', 'shovel', 'hooks'];
+const NOSHELF = ['lids', 'firebox', 'boom', 'table', 'cage', 'storedGrids', 'poker', 'shovel', 'hooks'];
+const BASE = [...NOSHELF, 'shelf'];
 export const PRESETS = {
-  showcase: { label: 'Showcase', on: [...BASE, 'lidHolder'], slots: { L: ['plancha', 1], R: ['vGrid', 1] }, firebox: -347 },
-  grill: { label: 'Twin grids', on: BASE, slots: { L: ['barGrid', 1], R: ['vGrid', 1] } },
-  flat: { label: 'Plancha + press', on: BASE, slots: { L: ['plancha', 1], R: ['press', 1] } },
+  showcase: { label: 'Showcase', on: [...BASE, 'lidHolder'], slots: { L: ['plancha', 3], R: ['vGrid', 3] }, firebox: -347 },
+  grill: { label: 'Twin grids', on: BASE, slots: { L: ['barGrid', 3], R: ['vGrid', 3] } },
+  flat: { label: 'Plancha + press', on: BASE, slots: { L: ['plancha', 3], R: ['press', 3] } },
   spit: { label: 'Double rotisserie', on: [...BASE, 'rot1', 'rot2'] },
   potjie: { label: 'Potjie & ribs', on: [...BASE, 'potjie', 'ribStand', 'breadClamp', 'lidHolder'], firebox: 426, boom: 0 },
-  oven: { label: 'Oven (lids closed)', on: BASE, slots: { L: ['barGrid', 1], R: ['vGrid', 1] }, lids: [0, 0] },
-  halfOven: { label: 'Half oven', on: BASE, slots: { L: ['barGrid', 1], R: ['plancha', 1] }, lids: [0, 1], firebox: -347 },
+  oven: { label: 'Oven (lids closed)', on: NOSHELF, slots: { L: ['barGrid', 3], R: ['vGrid', 3] }, lids: [0, 0] },
+  halfOven: { label: 'Half oven', on: NOSHELF, slots: { L: ['barGrid', 3], R: ['plancha', 3] }, lids: [0, 1], firebox: -347 },
   covered: { label: 'Covered', on: ['lids', 'cover', 'table', 'cage', 'firebox'], lids: [0, 0], tableOpen: 0 },
 };
 
@@ -713,6 +753,7 @@ export function buildPaulo({ finish = 'raw' } = {}) {
   const lidL = lid(M, -1), lidR = lid(M, 1);
   const lids = new THREE.Group(); lids.name = 'Oven lids'; lids.add(lidL, lidR);
   put('lids', lids);
+  put('shelf', upperShelf(M));
   put('firebox', fireboxSled(M));
   put('rot1', rotisserie(M, 0));
   put('rot2', rotisserie(M, 1));
@@ -738,7 +779,7 @@ export function buildPaulo({ finish = 'raw' } = {}) {
   // half-length cooking surfaces: any one in either half, at any of the three rail heights
   const surf = { barGrid: barGrid(M), vGrid: vGrid(M), plancha: plancha(M), press: sandwichPress(M) };
   for (const s of Object.values(surf)) root.add(s);
-  const slots = { L: ['none', 1], R: ['none', 1] };
+  const slots = { L: ['none', 3], R: ['none', 3] };
   const placeSlots = () => {
     for (const s of Object.values(surf)) s.visible = false;
     for (const side of ['L', 'R']) {
@@ -769,8 +810,8 @@ export function buildPaulo({ finish = 'raw' } = {}) {
       const p = PRESETS[name];
       for (const { key } of ACCESSORIES) parts[key].visible = p.on.includes(key);
       if (parts.potjie.visible) parts.boom.visible = true;
-      slots.L = [...(p.slots?.L ?? ['none', 1])];
-      slots.R = [...(p.slots?.R ?? ['none', 1])];
+      slots.L = [...(p.slots?.L ?? ['none', 3])];
+      slots.R = [...(p.slots?.R ?? ['none', 3])];
       placeSlots();
       const st = { tableOpen: p.tableOpen ?? 1, lidL: p.lids?.[0] ?? 1, lidR: p.lids?.[1] ?? 1, firebox: p.firebox ?? 0, boom: p.boom ?? 180, press: 0.4 };
       api.setTableOpen(st.tableOpen); api.setLid('L', st.lidL); api.setLid('R', st.lidR);

@@ -95,7 +95,7 @@ const presetRow = seg();
 for (const [k, p] of Object.entries(PRESETS)) presetRow.append(el('button', { onclick: () => sync(paulo.applyPreset(k)) }, p.label));
 section('Setup').append(presetRow);
 
-const sSurf = section('Cooking surfaces (each takes half the length)');
+const sSurf = section('Cooking surfaces and height above the coals');
 for (const [side, name] of [['L', 'Left half'], ['R', 'Right half']]) {
   const type = el('select', { 'aria-label': `${name} surface` }, ...SURFACES.map((s) => el('option', { value: s.key }, s.label)));
   const level = el('select', { 'aria-label': `${name} height` }, ...LEVELS.map((l, i) => el('option', { value: i }, l)));
@@ -109,6 +109,11 @@ for (const [side, name] of [['L', 'Left half'], ['R', 'Right half']]) {
 }
 
 const sMove = section('Move parts');
+// the upper shelf sits in the lids' swing path: it lifts off before a lid moves
+const moveLid = (side, v) => {
+  if (v < 100 && boxes.shelf.checked) { boxes.shelf.checked = false; paulo.setVisible('shelf', false); }
+  paulo.setLid(side, v / 100);
+};
 const range = (key, label, min, max, fn) => {
   const r = el('input', { type: 'range', min, max, step: 1, 'aria-label': label, oninput: (e) => fn(+e.target.value) });
   sliders[key] = r;
@@ -116,8 +121,8 @@ const range = (key, label, min, max, fn) => {
 };
 let spin = true;
 sMove.append(
-  range('lidL', 'Left lid: closed ↔ open', 0, 100, (v) => paulo.setLid('L', v / 100)),
-  range('lidR', 'Right lid: closed ↔ open', 0, 100, (v) => paulo.setLid('R', v / 100)),
+  range('lidL', 'Left lid: closed ↔ open', 0, 100, (v) => moveLid('L', v)),
+  range('lidR', 'Right lid: closed ↔ open', 0, 100, (v) => moveLid('R', v)),
   range('firebox', 'Slide the mobile firebox', -480, 480, (v) => paulo.setFirebox(v)),
   range('press', 'Sandwich press: closed ↔ open', 0, 100, (v) => paulo.setPress(v / 100)),
   range('table', 'Table: folded ↔ up', 0, 100, (v) => paulo.setTableOpen(v / 100)),
@@ -132,6 +137,7 @@ for (const { key, label } of ACCESSORIES) {
       paulo.setVisible(key, e.target.checked);
       if (key === 'potjie' && e.target.checked) { paulo.setVisible('boom', true); boxes.boom.checked = true; }
       if (key === 'boom' && !e.target.checked) boxes.potjie.checked = false;
+      if (key === 'shelf' && e.target.checked) for (const side of ['L', 'R']) { paulo.setLid(side, 1); sliders['lid' + side].value = 100; }
     },
   });
   boxes[key] = cb;
