@@ -121,7 +121,7 @@ function braaiBox(M) {
   for (const s of [-1, 1]) {
     const zo = s > 0 ? z1 : z0;
     B.add('frame', bmm(x0 + st, x1 - st, base + t, top, zo, zo - s * t));     // full-height front / back wall
-    B.add('frame', bmm(x0 + st, x1 - st, top, top + 6, zo + s * 3, zo - s * 34)); // rim flat the lid seats on
+    B.add('frame', bmm(x0 + st, x1 - st, top, top + 6, zo + s * 3, zo - s * 31)); // rim flat the lid seats on, flush with the brick face
   }
   // hollow end columns
   for (const sgn of [-1, 1]) {
@@ -143,6 +143,9 @@ function braaiBox(M) {
   // lid hinge lugs on the back wall
   for (const x of [-631, -131, 131, 631]) B.add('frame', bmm(x - 30, x + 30, top - 45, top + 4, z0 - 24, z0));
 
+  // lid open stops: past vertical the lid leans back and its counterweight rests here
+  for (const x of [-631, -131, 131, 631]) B.add('frame', bmm(x - 30, x + 30, 738, 790, z0 - 27, z0));
+
   // firebrick on every inside face
   const inX = x1 - st;
   brickWall(B, 2 * inX, 2 * (z1 - t), mx(TR(0, base + t, z1 - t, -PI / 2, 0, 0)), { t: ft - base - t });   // floor
@@ -154,10 +157,9 @@ function braaiBox(M) {
   // bar cannot slide along the box or tip over
   for (const zs of [-1, 1]) {
     B.add('zinc', bmm(-20, 20, top - 54, top - 48, zs * cz, zs * (cz - 32)));
-    for (const xs of [-1, 1]) B.add('zinc', bmm(xs * 15, xs * 20, top - 54, top - 6, zs * cz, zs * (cz - 32)));
-    // pocket back plate, carried by a web welded to the shell and up under the rim flat
-    B.add('zinc', bmm(-20, 20, top - 54, top - 6, zs * cz, zs * (cz - 5)));
-    B.add('frame', bmm(-3, 3, top - 120, top, zs * cz, zs * (cz + 25)));
+    for (const xs of [-1, 1]) B.add('zinc', bmm(xs * 15, xs * 20, top - 54, top + 6, zs * cz, zs * (cz - 32)));
+    // back plate, welded along its top to the inner edge of the rim like the racks
+    B.add('zinc', bmm(-20, 20, top - 54, top + 6, zs * cz, zs * (cz - 5)));
   }
   // square receiver sockets on both end walls, one per spit: the motor and roller
   // brackets drop in on a square tongue
@@ -171,21 +173,18 @@ function braaiBox(M) {
   for (const sgn of [-1, 1]) B.add('frame', bmm(sgn * 760, sgn * 812, 770, top, -357, -303));
 
   // Height adjustment with no moving parts: notched comb plates on the front and back
-  // walls. A surface's four pins drop down the open channel, then the surface slides
+  // walls. Nothing passes through the lining: each plate is welded along its top to the
+  // inner edge of the steel rim, hangs flat against the brick face and stands on the floor. A surface's four pins drop down the open channel, then the surface slides
   // 26 mm sideways so the pins sit in the notches at the chosen height.
   for (const hs of [-1, 1]) for (const px of [-1, 1]) for (const zs of [-1, 1]) {
     const g = new THREE.ExtrudeGeometry(combShape(hs), { depth: 6, bevelEnabled: false });
     g.translate(hs * DIM.half.cx + px * DIM.half.pinX, COMB.y0, zs > 0 ? cz - 6 : -cz);
     B.add('zinc', g);
-    // the rack is a T-section: this web is welded to the shell before bricking and sits in a
-    // vertical brick joint, behind the solid spine of the comb
-    const xw = hs * DIM.half.cx + px * DIM.half.pinX + hs * 41;
-    B.add('frame', bmm(xw - 3, xw + 3, COMB.y0, COMB.y0 + COMB.h, zs * cz, zs * (cz + 25)));
   }
   return B.build(M);
 }
 
-const COMB = { y0: 726, h: 266 };
+const COMB = { y0: DIM.floorTop, h: DIM.rimY - DIM.floorTop };
 function combShape(hs) {
   // x = 0 is where a seated pin rests; the channel is 26 mm toward the end wall
   const pts = [[-22, 0], [48, 0], [48, COMB.h], [34, COMB.h]];
@@ -395,7 +394,20 @@ function lid(M, sgn) {
 
   // firebrick lining
   const wi = w - 2 * t - 2;
-  brickWall(B, wi, D - run - zb - t - 25, mx(TR(xc, H - t, zb + t + 25, PI / 2, 0, 0)));
+  // roof lining, laid around a square flue opening under the exhaust stack
+  const fx = xc + sgn * 190, fz = 125, fo = 62;
+  const roof = (xA, xB, zA, zB) => brickWall(B, xB - xA, zB - zA, mx(TR((xA + xB) / 2, H - t, zA, PI / 2, 0, 0)));
+  const rz0 = zb + t + 25, rz1 = D - run;
+  roof(xc - wi / 2, xc + wi / 2, rz0, fz - fo);
+  roof(xc - wi / 2, xc + wi / 2, fz + fo, rz1);
+  roof(xc - wi / 2, fx - fo, fz - fo, fz + fo);
+  roof(fx + fo, xc + wi / 2, fz - fo, fz + fo);
+  for (const k of [-1, 1]) {                       // steel liner through the brick
+    B.add('frame', bmm(fx + k * fo, fx + k * (fo - 3), H - t - 27, H - t, fz - fo, fz + fo));
+    B.add('frame', bmm(fx - fo, fx + fo, H - t - 27, H - t, fz + k * fo, fz + k * (fo - 3)));
+  }
+  const throat = new THREE.CylinderGeometry(49, 49, 1, 28); throat.translate(fx, H - t - 1, fz);
+  B.add('castiron', throat);
   brickWall(B, wi, H - t - 8, mx(T(xc, 6, zb + t)));
   brickWall(B, wi, skirt - 10, mx(TR(xc, 6, D - t, 0, PI, 0)));
   brickWall(B, wi, L - 34, mx(TR(xc, H - t - 4, D - run - 4, Math.atan2(run, -(H - skirt)), 0, 0)));
@@ -422,7 +434,7 @@ function lid(M, sgn) {
 
   // exhaust stack with screw-down cap, at the back outer corner: air enters low at the
   // front, crosses the fire and the food, and leaves high at the back
-  const sx = xc + sgn * 190, sz = 125;
+  const sx = fx, sz = fz;
   const cyl = (r, h, y, open = false) => { const g = new THREE.CylinderGeometry(r, r, h, 28, 1, open); g.translate(sx, y, sz); return g; };
   B.add('frame', cyl(50, 130, H + 65, true));
   B.add('frame', cyl(64, 5, H + 2));
