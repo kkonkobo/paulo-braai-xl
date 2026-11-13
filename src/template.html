@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#dcdfe2">
+<title>Paulo Braai XL: 3D concept</title>
+<style>
+  :root { --ink: #1d1c1a; --muted: #62676c; --line: #d5d8db; --panel: #f3f4f5; --accent: #c4622d; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #dcdfe2; }
+  .shell { display: grid; grid-template-columns: 1fr 320px; height: 100dvh; }
+  #app { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+  #app canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  header { position: absolute; left: 20px; top: 16px; right: 20px; pointer-events: none; }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+  header p { margin: 2px 0 0; color: var(--muted); }
+  .specs { position: absolute; left: 20px; right: 20px; bottom: 14px; color: var(--muted); font-size: 12px; pointer-events: none; }
+  .specs b { color: var(--ink); font-weight: 600; }
+  #tip { position: absolute; left: 0; top: 0; padding: 4px 8px; background: var(--ink); color: #fff; border-radius: 4px; font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .12s; white-space: nowrap; }
+  #ui { min-width: 0; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 16px calc(24px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+  section { padding: 10px 0 12px; border-bottom: 1px solid var(--line); }
+  section:last-child { border: 0; }
+  h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .seg { display: flex; gap: 6px; }
+  .seg.wrap { flex-wrap: wrap; }
+  button, select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; color: var(--ink); }
+  button:hover { border-color: #aeb3b8; }
+  button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.primary { width: 100%; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 9px; }
+  .slot { display: grid; grid-template-columns: 70px 1fr 84px; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .slot span { color: var(--muted); }
+  .slot select { min-width: 0; width: 100%; }
+  .list { display: grid; gap: 4px; }
+  label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  input[type=checkbox] { accent-color: var(--accent); margin: 0; }
+  label.range { flex-direction: column; align-items: stretch; gap: 2px; margin-bottom: 8px; }
+  label.range span { color: var(--muted); }
+  input[type=range] { accent-color: var(--accent); width: 100%; }
+  @media (max-width: 760px) {
+    html, body { font-size: 15px; }
+    .shell { grid-template-columns: 1fr; grid-template-rows: 52dvh 1fr; }
+    #ui { border-left: 0; border-top: 1px solid var(--line); }
+    header { left: 14px; top: 10px; }
+    header h1 { font-size: 18px; }
+    header p, .specs { font-size: 11px; }
+    .specs { left: 14px; bottom: 8px; }
+    button, select { padding: 9px 12px; }
+    .list { gap: 10px; }
+    .slot { grid-template-columns: 76px 1fr 96px; }
+    input[type=checkbox] { width: 18px; height: 18px; }
+    label.range { margin-bottom: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div id="app">
+    <header><h1>Paulo Braai XL</h1><p>Lidded oven concept · drag to orbit, pinch or scroll to zoom, tap a part to name it</p></header>
+    <div class="specs">Braai box <b>1520 × 720 mm</b> · cooking area <b>1390 × 658 mm</b>, two halves of <b>685 × 640</b> · firebrick on every inside face</div>
+    <div id="tip"></div>
+  </div>
+  <aside id="ui"></aside>
+</div>
+<!--SCRIPT-->
+</body>
+</html>
