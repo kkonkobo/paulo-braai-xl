@@ -177,7 +177,7 @@ function sync(st) {
 
 document.documentElement.lang = lang;
 document.title = t('Paulo Braai XL: 3D concept');
-document.getElementById('sub').textContent = t('Lidded oven concept · drag to orbit, pinch or scroll to zoom, tap a part to name it');
+document.getElementById('sub').textContent = t('Drag to orbit, pinch to zoom · tap a part to move it');
 document.getElementById('specs').innerHTML = `${t('Braai box')} <b>1520 × 720 mm</b> · ${t('cooking area')} <b>1390 × 658 mm</b>, ${t('two halves of')} <b>646 × 640</b> · ${t('surface height')} <b>92 ${t('to')} 292 mm</b> ${t('above the floor')}`;
 
 const langRow = seg('seg');
@@ -320,28 +320,99 @@ section('Export').append(el('button', {
 if (params.get('bricks') === '0') paulo.setBricks(false);
 sync(paulo.applyPreset(PRESETS[params.get('preset')] ? params.get('preset') : 'showcase'));
 
-// name the part under the cursor / finger
+// hover names a part; a click or tap on a moving part operates it
 const tip = document.getElementById('tip');
+const pop = document.getElementById('pop');
 const ray = new THREE.Raycaster();
 const ptr = new THREE.Vector2();
 const visibleUp = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
-function pick(e) {
+const [lidLObj, lidRObj] = paulo.parts.lids.children;
+const TOGGLES = new Map([
+  [paulo.body.getObjectByName('Ash gate'), 'ashGate'], [paulo.body.getObjectByName('Ash drawer'), 'ashDrawer'],
+  [lidLObj, 'lidL'], [lidRObj, 'lidR'], [paulo.parts.table, 'table'], [paulo.parts.boom, 'boom'],
+  [paulo.surf.press.userData.top, 'press'],
+]);
+const SURF = new Map(Object.entries(paulo.surf).map(([k, o]) => [o, k]));
+// what a part does when clicked: a slider to flip, a surface to raise / lower, or the firebox to slide
+function actionOf(o) {
+  for (; o; o = o.parent) {
+    if (TOGGLES.has(o)) return { toggle: TOGGLES.get(o) };
+    if (SURF.has(o)) return { surface: SURF.get(o) };
+    if (o === paulo.parts.firebox) return { firebox: true };
+  }
+  return null;
+}
+const anims = {};   // slider key -> value it is gliding to
+const glide = (key, to) => { anims[key] = Math.max(+sliders[key].min, Math.min(+sliders[key].max, to)); };
+function stepAnims(dt) {
+  for (const [key, to] of Object.entries(anims)) {
+    const r = sliders[key], span = r.max - r.min, v = +r.value;
+    const nv = Math.abs(to - v) <= span * dt * 1.6 ? to : v + Math.sign(to - v) * span * dt * 1.6;
+    r.value = nv; r.dispatchEvent(new Event('input'));
+    if (nv === to || +r.value === v) delete anims[key];
+  }
+}
+function hitAt(e) {
   const r = renderer.domElement.getBoundingClientRect();
   ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ptr, camera);
-  const hit = ray.intersectObject(paulo.root, true).find((h) => visibleUp(h.object));
+  return [ray.intersectObject(paulo.root, true).find((h) => visibleUp(h.object)), r];
+}
+const place = (box, e, r) => {
+  const x = Math.max(8, Math.min(e.clientX - r.left + 14, r.width - box.offsetWidth - 8));
+  const y = Math.min(e.clientY - r.top + 14, r.height - box.offsetHeight - 8);
+  box.style.transform = `translate(${x}px, ${y}px)`;
+};
+function pick(e) {
+  const [hit, r] = hitAt(e);
+  renderer.domElement.style.cursor = hit && actionOf(hit.object) ? 'pointer' : '';
   if (!hit) { tip.style.opacity = 0; return; }
   tip.textContent = t(hit.object.name.split(':')[0]);
-  const x = Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 8);
-  tip.style.transform = `translate(${x}px, ${e.clientY - r.top + 14}px)`;
+  place(tip, e, r);
   tip.style.opacity = 1;
+}
+const closePop = () => { pop.hidden = true; };
+function openPop(e, r, title, build) {
+  const body = el('div', { class: 'row' });
+  const draw = () => { body.replaceChildren(...build(draw)); };
+  draw();
+  pop.replaceChildren(el('b', {}, title), body);
+  pop.hidden = false;
+  place(pop, e, r);
+}
+const btn = (label, name, off, fn) => { const b = el('button', { 'aria-label': name, title: name, onclick: fn }, label); b.disabled = off; return b; };
+function click(e) {
+  const [hit, r] = hitAt(e);
+  closePop();
+  const act = hit && actionOf(hit.object);
+  if (!act) { if (e.pointerType !== 'mouse') pick(e); return; }
+  tip.style.opacity = 0;
+  if (act.toggle) {
+    const sl = sliders[act.toggle], mid = (+sl.min + +sl.max) / 2;
+    const now = anims[act.toggle] ?? +sl.value;
+    glide(act.toggle, act.toggle === 'boom' ? (Math.abs(now) > 90 ? 0 : 180) : now > mid ? +sl.min : +sl.max);
+  } else if (act.surface) {
+    const side = selects.L.type.value === act.surface ? 'L' : 'R', lv = selects[side].level;
+    const move = (d, redraw) => { lv.value = +lv.value + d; lv.dispatchEvent(new Event('change')); redraw(); };
+    openPop(e, r, t(SURFACES.find((s) => s.key === act.surface).label), (redraw) => [
+      btn('▼', t('Lower'), +lv.value === 0, () => move(-1, redraw)),
+      el('span', {}, `${parseInt(LEVELS[+lv.value], 10)} mm`),
+      btn('▲', t('Raise'), +lv.value === LEVELS.length - 1, () => move(1, redraw)),
+    ]);
+  } else {
+    const sl = sliders.firebox, at = () => anims.firebox ?? +sl.value;
+    openPop(e, r, t('Mobile firebox (sled)'), () => [
+      btn('◀', t('Slide left'), false, () => glide('firebox', at() - 160)),
+      btn('▶', t('Slide right'), false, () => glide('firebox', at() + 160)),
+    ]);
+  }
 }
 renderer.domElement.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') pick(e); });
 renderer.domElement.addEventListener('pointerleave', () => (tip.style.opacity = 0));
 let down = null;
 renderer.domElement.addEventListener('pointerdown', (e) => (down = [e.clientX, e.clientY]));
-renderer.domElement.addEventListener('pointerup', (e) => {   // a tap, not a drag
-  if (e.pointerType !== 'mouse' && down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 6) pick(e);
+renderer.domElement.addEventListener('pointerup', (e) => {   // a click or tap, not a drag
+  if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 6) click(e); else closePop();
 });
 
 // ------------------------------------------------------------- loop
@@ -360,6 +431,7 @@ const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
   if (spin) paulo.spin(dt);
+  stepAnims(dt);
   if (tween) {
     tween.t = Math.min(1, tween.t + dt * 1.6);
     const k = tween.t * tween.t * (3 - 2 * tween.t);
@@ -376,4 +448,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
   placeDims();
 });
-window.__paulo = paulo;
+window.__paulo = paulo; window.__cam = camera; window.__T = THREE;

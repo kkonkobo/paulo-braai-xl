@@ -2,7 +2,8 @@
 const FR = {
   // header
   'Paulo Braai XL: 3D concept': 'Paulo Braai XL : concept 3D',
-  'Lidded oven concept · drag to orbit, pinch or scroll to zoom, tap a part to name it': 'Braai-four à couvercles · glisser pour tourner, pincer ou molette pour zoomer, toucher une pièce pour la nommer',
+  'Drag to orbit, pinch to zoom · tap a part to move it': 'Glisser pour tourner, pincer pour zoomer · toucher une pièce pour la bouger',
+  Lower: 'Descendre', Raise: 'Monter', 'Slide left': 'Glisser à gauche', 'Slide right': 'Glisser à droite',
   'Braai box': 'Cuve', 'cooking area': 'zone de cuisson', 'two halves of': 'deux moitiés de',
   'surface height': 'hauteur de cuisson', to: 'à', 'above the floor': 'au-dessus de la sole',
   // sections
