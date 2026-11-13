@@ -155,6 +155,9 @@ function braaiBox(M) {
   for (const zs of [-1, 1]) {
     B.add('zinc', bmm(-20, 20, top - 54, top - 48, zs * cz, zs * (cz - 32)));
     for (const xs of [-1, 1]) B.add('zinc', bmm(xs * 15, xs * 20, top - 54, top - 6, zs * cz, zs * (cz - 32)));
+    // pocket back plate, carried by a web welded to the shell and up under the rim flat
+    B.add('zinc', bmm(-20, 20, top - 54, top - 6, zs * cz, zs * (cz - 5)));
+    B.add('frame', bmm(-3, 3, top - 120, top, zs * cz, zs * (cz + 25)));
   }
   // square receiver sockets on both end walls, one per spit: the motor and roller
   // brackets drop in on a square tongue
@@ -174,6 +177,10 @@ function braaiBox(M) {
     const g = new THREE.ExtrudeGeometry(combShape(hs), { depth: 6, bevelEnabled: false });
     g.translate(hs * DIM.half.cx + px * DIM.half.pinX, COMB.y0, zs > 0 ? cz - 6 : -cz);
     B.add('zinc', g);
+    // the rack is a T-section: this web is welded to the shell before bricking and sits in a
+    // vertical brick joint, behind the solid spine of the comb
+    const xw = hs * DIM.half.cx + px * DIM.half.pinX + hs * 41;
+    B.add('frame', bmm(xw - 3, xw + 3, COMB.y0, COMB.y0 + COMB.h, zs * cz, zs * (cz + 25)));
   }
   return B.build(M);
 }
@@ -558,7 +565,12 @@ function rotisserieVariant(M, i, mode) {
   const z = DIM.spitZ[i], y = DIM.spitY, { x1, top } = DIM.box;
   const sgn = mode === 'L' ? -1 : 1, xm = sgn * x1, half = mode !== 'full';
   const K = new Part(`Rotisserie ${i + 1}: motor${half ? '' : ' and roller'} bracket`);
-  K.add('zinc', bmm(xm + sgn * 2, xm + sgn * 8, top - 80, y + 28, z - 48, z + 48));
+  // bracket plate with an open-topped slot the spit drops through
+  K.add('zinc', bmm(xm + sgn * 2, xm + sgn * 8, top - 80, y - 18, z - 48, z + 48));
+  for (const k of [-1, 1]) K.add('zinc', bmm(xm + sgn * 2, xm + sgn * 8, y - 18, y + 28, z + k * 16, z + k * 48));
+  // drive: a square-bore sleeve on the motor shaft; the square spit end pushes into it
+  K.add('zinc', rod(V(xm - sgn * 16, y, z), V(xm + sgn * 10, y, z), 13, 20));
+  K.add('castiron', box(1.5, 11, 11, xm - sgn * 16.5, y, z));
   K.add('zinc', bmm(xm + sgn * 4, xm + sgn * 26, top - 168, top - 80, z - 11, z + 11));   // square tongue
   K.add('plastic', box(72, 130, 112, xm + sgn * 44, y - 18, z));
   K.add('plastic', box(76, 18, 116, xm + sgn * 44, y + 40, z));
@@ -570,16 +582,20 @@ function rotisserieVariant(M, i, mode) {
   grp.add(K.build(M));
   const spit = new THREE.Group(); spit.name = `Spit rod ${i + 1}`;
   const S = new Part(half ? `Half-length spit rod ${i + 1}` : `Spit rod ${i + 1}`);
-  let forks;
+  let forks, stops;
   if (half) {
     S.add('stainless', box(845, 10, 10, sgn * 377.5, 0, 0));          // motor to just past the centre bridge
     S.add('stainless', rod(V(-sgn * 45, -20, 0), V(-sgn * 45, 20, 0), 5));
+    stops = [-14, 14];                                              // either side of the bridge rollers
     forks = [[sgn * 150, sgn], [sgn * 600, -sgn]];
   } else {
     S.add('stainless', box(1650, 10, 10, -sgn * 25, 0, 0));
     S.add('wood', rod(V(-sgn * 950, 0, 0), V(-sgn * 850, 0, 0), 14, 16));
     forks = [[-520, 1], [-190, -1], [190, 1], [520, -1]];
+    stops = [-xm - sgn * 21, -xm + sgn * 7];                        // either side of the end-wall rollers
   }
+  // two collars straddle the rollers, so the spit cannot creep out of the drive sleeve
+  for (const cx of stops) S.add('stainless', rod(V(cx - 2.5, 0, 0), V(cx + 2.5, 0, 0), 17, 20));
   for (const [fx, dirn] of forks) {
     S.add('stainless', box(40, 26, 26, fx, 0, 0));
     S.add('stainless', rod(V(fx, 13, 0), V(fx, 40, 0), 4));
@@ -887,6 +903,7 @@ export function buildPaulo({ finish = 'raw' } = {}) {
     },
     setTableOpen: (f) => { parts.table.rotation.x = (1 - f) * (PI / 2); },   // 0 folded, 1 up
     setLid: (side, f) => { (side === 'L' ? lidL : lidR).rotation.x = -f * (100 * PI) / 180; },  // 0 closed, 1 open
+    setBricks: (v) => { for (const k of ['brick0', 'brick1', 'brick2', 'mortar']) M[k].visible = v; },   // hide the lining to see the fixings
     setFirebox: (x) => { parts.firebox.position.x = x; },                    // mm along the floor
     setPress: (f) => { surf.press.userData.top.rotation.x = -f * (75 * PI) / 180; },
     setBoomAngle: (a) => { parts.boom.rotation.y = a; },                     // 0 = over the fire

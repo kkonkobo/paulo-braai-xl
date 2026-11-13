@@ -139,6 +139,7 @@ sMove.append(
   range('table', 'Table: folded ↔ up', 0, 100, (v) => paulo.setTableOpen(v / 100)),
   range('boom', 'Swing potjie boom', -180, 180, (v) => paulo.setBoomAngle((v * Math.PI) / 180)),
   el('label', {}, el('input', { type: 'checkbox', checked: '', onchange: (e) => (spin = e.target.checked) }), 'Turn the rotisseries'),
+  el('label', {}, el('input', { type: 'checkbox', onchange: (e) => paulo.setBricks(!e.target.checked) }), 'Hide the firebricks (show how things are fixed)'),
 );
 
 const list = el('div', { class: 'list' });
@@ -173,6 +174,7 @@ section('Export').append(el('button', {
   },
 }, 'Download current setup (.glb)'));
 
+if (params.get('bricks') === '0') paulo.setBricks(false);
 sync(paulo.applyPreset(PRESETS[params.get('preset')] ? params.get('preset') : 'showcase'));
 
 // name the part under the cursor / finger
