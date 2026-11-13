@@ -56,6 +56,8 @@ const VIEWS = {
   Inside: [0.5, 2.6, 1.7],
   Back: [-0.9, 1.6, -3.4],
   Top: [0, 4.4, 0.5],
+  'Motor mount': [2.3, 1.5, 0.5],
+  'Spit bridge': [-0.25, 1.75, 1.05],
 };
 let tween = null;
 const goView = (name) => { tween = { from: camera.position.clone(), to: new THREE.Vector3(...VIEWS[name]), t: 0 }; };

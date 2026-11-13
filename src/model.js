@@ -150,8 +150,20 @@ function braaiBox(M) {
   brickWall(B, 2 * inX, top - ft, mx(TR(0, ft, z1 - t, 0, PI, 0)));                                          // front
   for (const sgn of [-1, 1]) brickWall(B, 2 * cz, top - ft, mx(TR(sgn * inX, ft, 0, 0, -sgn * PI / 2, 0))); // ends
 
-  // saddles the centre spit bridge hangs in
-  for (const zs of [-1, 1]) B.add('zinc', bmm(-16, 16, top - 62, top - 50, zs * cz, zs * (cz - 24)));
+  // open-topped pockets the centre spit bridge drops into: a floor and two cheeks, so the
+  // bar cannot slide along the box or tip over
+  for (const zs of [-1, 1]) {
+    B.add('zinc', bmm(-20, 20, top - 54, top - 48, zs * cz, zs * (cz - 32)));
+    for (const xs of [-1, 1]) B.add('zinc', bmm(xs * 15, xs * 20, top - 54, top - 6, zs * cz, zs * (cz - 32)));
+  }
+  // square receiver sockets on both end walls, one per spit: the motor and roller
+  // brackets drop in on a square tongue
+  for (const sgn of [-1, 1]) for (const z of DIM.spitZ) {
+    const xo = sgn * x1;
+    for (const dz of [-15, 11]) B.add('frame', bmm(xo, xo + sgn * 30, top - 170, top - 80, z + dz, z + dz + 4));
+    B.add('frame', bmm(xo + sgn * 26, xo + sgn * 30, top - 170, top - 80, z - 15, z + 15));
+    B.add('frame', bmm(xo, xo + sgn * 30, top - 174, top - 170, z - 15, z + 15));
+  }
   // sockets for the removable upper shelf, outside the back corners
   for (const sgn of [-1, 1]) B.add('frame', bmm(sgn * 760, sgn * 812, 770, top, -357, -303));
 
@@ -546,13 +558,13 @@ function rotisserieVariant(M, i, mode) {
   const z = DIM.spitZ[i], y = DIM.spitY, { x1, top } = DIM.box;
   const sgn = mode === 'L' ? -1 : 1, xm = sgn * x1, half = mode !== 'full';
   const K = new Part(`Rotisserie ${i + 1}: motor${half ? '' : ' and roller'} bracket`);
-  K.add('zinc', bmm(xm, xm + sgn * 6, top - 130, y + 28, z - 48, z + 48));
+  K.add('zinc', bmm(xm + sgn * 2, xm + sgn * 8, top - 80, y + 28, z - 48, z + 48));
+  K.add('zinc', bmm(xm + sgn * 4, xm + sgn * 26, top - 168, top - 80, z - 11, z + 11));   // square tongue
   K.add('plastic', box(72, 130, 112, xm + sgn * 44, y - 18, z));
   K.add('plastic', box(76, 18, 116, xm + sgn * 44, y + 40, z));
-  for (const dz of [-30, 30]) K.add('zinc', rod(V(xm, top - 100, z + dz), V(xm + sgn * 12, top - 100, z + dz), 7));
   if (!half) {
-    K.add('zinc', bmm(-xm - sgn * 6, -xm, top - 130, y - 4, z - 42, z + 42));
-    for (const dz of [-30, 30]) K.add('zinc', rod(V(-xm - sgn * 12, top - 100, z + dz), V(-xm, top - 100, z + dz), 7));
+    K.add('zinc', bmm(-xm - sgn * 8, -xm - sgn * 2, top - 80, y - 4, z - 42, z + 42));
+    K.add('zinc', bmm(-xm - sgn * 26, -xm - sgn * 4, top - 168, top - 80, z - 11, z + 11));
     for (const dz of [-16, 16]) K.add('zinc', rod(V(-xm - sgn * 16, y - 9, z + dz), V(-xm + sgn * 2, y - 9, z + dz), 11, 14));
   }
   grp.add(K.build(M));
@@ -590,13 +602,13 @@ function rotisserie(M, i) {
 
 function spitBridge(M) {
   // Drop-in centre support for half-length spits: a bar across the middle of the box,
-  // hung in two saddles just under the rim (so the lids still close), with a roller
+  // dropped into two pockets just under the rim (so the lids still close), with a roller
   // cradle for each spit.
   const B = new Part('Centre spit bridge (drop-in)');
   const cz = DIM.clearZ, y = DIM.spitY, top = DIM.box.top;
-  B.add('frame', bmm(-4, 4, top - 50, top - 4, -cz + 2, cz - 2));
+  B.add('frame', bmm(-15, 15, top - 48, top - 8, -cz + 2, cz - 2));      // 30 x 40 tube, ends sit in the wall pockets
   for (const z of DIM.spitZ) {
-    B.add('frame', bmm(-4, 4, top - 4, y - 8, z - 22, z + 22));
+    B.add('frame', bmm(-4, 4, top - 8, y - 8, z - 22, z + 22));
     for (const dz of [-16, 16]) B.add('zinc', rod(V(-9, y - 9, z + dz), V(9, y - 9, z + dz), 11, 14));
   }
   B.add('frame', bentRod([V(0, top - 4, -45), V(0, top + 40, -45), V(0, top + 40, 45), V(0, top - 4, 45)], 5));
@@ -640,7 +652,7 @@ function poker(M) {
 
 function toolHooks(M) {
   const B = new Part('Tool hooks (S-hooks)');
-  [-225, -195, -165, -135, -105].forEach((z, i) => {
+  [-240, -216, -122, -99, -76].forEach((z, i) => {
     const g = sHook(0, 0, 0, 125 + (i % 2) * 22);
     g.rotateY(PI / 2); g.translate(DIM.box.x0 - 45, 930, z);
     B.add('zinc', g);
