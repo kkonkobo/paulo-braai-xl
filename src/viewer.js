@@ -58,6 +58,7 @@ const VIEWS = {
   Top: [0, 4.4, 0.5],
   'Motor mount': [1.75, 1.3, 0.75, 0.8, 1.0, -0.05],
   'Spit bridge': [-0.45, 1.5, 0.75, 0, 1.0, -0.1],
+  'Ash clean-out': [-0.35, 2.15, 0.8, 0, 0.66, 0],
   'Rack hangers': [0.12, 1.24, 0.3, -0.2, 0.97, -0.34],   // close-ups carry their own look-at point
 };
 let tween = null;
@@ -139,12 +140,16 @@ sMove.append(
   range('lidR', 'Right lid: closed ↔ open', 0, 100, (v) => moveLid('R', v)),
   range('firebox', 'Slide the mobile firebox', -480, 480, (v) => paulo.setFirebox(v)),
   range('press', 'Sandwich press: closed ↔ open', 0, 100, (v) => paulo.setPress(v / 100)),
+  range('ashGate', 'Ash gate: shut ↔ open', 0, 100, (v) => paulo.setAshGate(v / 100)),
+  range('ashDrawer', 'Ash drawer: in ↔ out', 0, 100, (v) => paulo.setAshDrawer(v / 100)),
   range('table', 'Table: folded ↔ up', 0, 100, (v) => paulo.setTableOpen(v / 100)),
   range('boom', 'Swing potjie boom', -180, 180, (v) => paulo.setBoomAngle((v * Math.PI) / 180)),
   el('label', {}, el('input', { type: 'checkbox', checked: '', onchange: (e) => (spin = e.target.checked) }), 'Turn the rotisseries'),
   el('label', {}, el('input', { type: 'checkbox', onchange: (e) => paulo.setBricks(!e.target.checked) }), 'Hide the firebricks (show how things are fixed)'),
 );
 
+sliders.ashGate.value = +(params.get('gate') || 0); sliders.ashDrawer.value = +(params.get('drawer') || 0);
+paulo.setAshGate(sliders.ashGate.value / 100); paulo.setAshDrawer(sliders.ashDrawer.value / 100);
 const list = el('div', { class: 'list' });
 for (const { key, label } of ACCESSORIES) {
   if (key.startsWith('rot')) continue;   // rotisseries have their own selects

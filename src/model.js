@@ -117,7 +117,11 @@ function braaiBox(M) {
   const B = new Part('Braai box (fully brick-lined)');
   const { x0, x1, z0, z1, base, top } = DIM.box;
   const t = 6, st = DIM.sideT, ft = DIM.floorTop, cz = DIM.clearZ;
-  B.add('frame', bmm(x0, x1, base, base + t, z0, z1));                 // floor plate
+  // floor plate, with the ash chute opening in the middle
+  const A = ASH;
+  B.add('frame', bmm(x0, x1, base, base + t, z0, -A.hz));
+  B.add('frame', bmm(x0, x1, base, base + t, A.hz, z1));
+  for (const k of [-1, 1]) B.add('frame', bmm(k * A.hx, k * x1, base, base + t, -A.hz, A.hz));
   for (const s of [-1, 1]) {
     const zo = s > 0 ? z1 : z0;
     B.add('frame', bmm(x0 + st, x1 - st, base + t, top, zo, zo - s * t));     // full-height front / back wall
@@ -148,7 +152,9 @@ function braaiBox(M) {
 
   // firebrick on every inside face
   const inX = x1 - st;
-  brickWall(B, 2 * inX, 2 * (z1 - t), mx(TR(0, base + t, z1 - t, -PI / 2, 0, 0)), { t: ft - base - t });   // floor
+  const floor = (xA, xB, zA, zB) => brickWall(B, xB - xA, zB - zA, mx(TR((xA + xB) / 2, base + t, zB, -PI / 2, 0, 0)), { t: ft - base - t });
+  floor(-inX, inX, -(z1 - t), -A.hz); floor(-inX, inX, A.hz, z1 - t);        // floor, laid around the ash chute
+  floor(-inX, -A.hx, -A.hz, A.hz); floor(A.hx, inX, -A.hz, A.hz);
   brickWall(B, 2 * inX, top - ft, mx(T(0, ft, z0 + t)));                                                    // back
   brickWall(B, 2 * inX, top - ft, mx(TR(0, ft, z1 - t, 0, PI, 0)));                                          // front
   for (const sgn of [-1, 1]) brickWall(B, 2 * cz, top - ft, mx(TR(sgn * inX, ft, 0, 0, -sgn * PI / 2, 0))); // ends
@@ -192,6 +198,44 @@ function braaiBox(M) {
     }
   }
   return B.build(M);
+}
+
+// ash chute: a 400 x 120 slot in the middle of the floor, on the centre line between the halves
+const ASH = { hx: 200, hz: 60, gateY: 588, pull: 125, slide: 430 };
+function ashSystem(M) {
+  // Rake ash to the slot, pull the knob: the gate slides forward and everything drops into
+  // the drawer hanging under the box. The drawer pulls out to the front to empty.
+  const grp = new THREE.Group(); grp.name = 'Ash clean-out';
+  const { hx, hz, gateY } = ASH, ft = DIM.floorTop;
+  const F = new Part('Ash chute and runners');
+  for (const k of [-1, 1]) {                       // steel throat from the brick floor down to the gate
+    F.add('frame', bmm(k * hx, k * (hx + 4), gateY + 6, ft, -hz - 4, hz + 4));
+    F.add('frame', bmm(-hx, hx, gateY + 6, ft, k * hz, k * (hz + 4)));
+    F.add('frame', bmm(k * 222, k * 240, gateY - 5, gateY, -hz - 10, hz + 140));   // gate guides
+    F.add('frame', bmm(k * 236, k * 240, gateY - 5, 602, -hz - 10, hz + 140));
+    F.add('frame', bmm(k * 218, k * 248, 474, 478, -160, 300));                    // drawer runners
+    for (const z of [-145, 285]) F.add('frame', bmm(k * 244, k * 248, 474, 602, z - 15, z + 15));
+  }
+  grp.add(F.build(M));
+  const gate = new THREE.Group(); gate.name = 'Ash gate';
+  const G = new Part('Ash gate (pull to dump)');
+  G.add('frame', bmm(-220, 220, gateY, gateY + 5, -hz - 8, hz + 8));
+  G.add('zinc', rod(V(0, gateY + 2, hz + 8), V(0, gateY + 2, 344), 6));
+  const knob = new THREE.SphereGeometry(14, 14, 10); knob.translate(0, gateY + 2, 352);
+  G.add('wood', knob);
+  gate.add(G.build(M));
+  const drawer = new THREE.Group(); drawer.name = 'Ash drawer';
+  const D = new Part('Ash drawer (pulls out to empty)');
+  const y0 = 480, y1 = 578, zA = -150, zB = 330, w = 214;
+  D.add('frame', bmm(-w, w, y0, y0 + 2, zA, zB));
+  for (const k of [-1, 1]) D.add('frame', bmm(k * w, k * (w - 2), y0, y1, zA, zB));
+  D.add('frame', bmm(-w, w, y0, y1, zA, zA + 2));
+  D.add('frame', bmm(-w, w, y0, y1, zB - 3, zB));
+  D.add('zinc', bentRod([V(-90, 530, zB), V(-90, 530, zB + 26), V(90, 530, zB + 26), V(90, 530, zB)], 6));
+  drawer.add(D.build(M));
+  grp.add(gate, drawer);
+  grp.userData = { gate, drawer };
+  return grp;
 }
 
 const COMB = { y0: DIM.floorTop, h: DIM.rimY - DIM.floorTop };
@@ -834,7 +878,8 @@ export function buildPaulo({ finish = 'raw' } = {}) {
   root.scale.setScalar(0.001);
 
   const body = new THREE.Group(); body.name = 'Paulo body';
-  body.add(cart(M), braaiBox(M), airVents(M));
+  const ash = ashSystem(M);
+  body.add(cart(M), braaiBox(M), airVents(M), ash);
   root.add(body);
 
   const parts = {};
@@ -925,6 +970,8 @@ export function buildPaulo({ finish = 'raw' } = {}) {
     },
     setTableOpen: (f) => { parts.table.rotation.x = (1 - f) * (PI / 2); },   // 0 folded, 1 up
     setLid: (side, f) => { (side === 'L' ? lidL : lidR).rotation.x = -f * (100 * PI) / 180; },  // 0 closed, 1 open
+    setAshGate: (f) => { ash.userData.gate.position.z = f * ASH.pull; },       // 0 shut, 1 open
+    setAshDrawer: (f) => { ash.userData.drawer.position.z = f * ASH.slide; },  // 0 in, 1 pulled out
     setBricks: (v) => { for (const k of ['brick0', 'brick1', 'brick2', 'mortar']) M[k].visible = v; },   // hide the lining to see the fixings
     setFirebox: (x) => { parts.firebox.position.x = x; },                    // mm along the floor
     setPress: (f) => { surf.press.userData.top.rotation.x = -f * (75 * PI) / 180; },
