@@ -2,7 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { buildPaulo, ACCESSORIES, PRESETS, FINISHES, SURFACES, LEVELS, SPIT_MODES } from './model.js';
+import { buildPaulo, ACCESSORIES, PRESETS, FINISHES, SURFACES, LEVELS, SPIT_MODES, DIM } from './model.js';
+import { t, lang } from './i18n.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 const app = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -49,6 +53,88 @@ scene.add(wall);
 const paulo = buildPaulo({ finish: params.get('finish') || 'black' });
 scene.add(paulo.root);
 
+// ------------------------------------------------------------- dimensions (mm)
+const { box: BX, rimY, floorTop, clearZ, half: HF } = DIM;
+const shelfOn = () => paulo.parts.shelf.visible;
+const tableUp = () => paulo.parts.table.visible && Math.abs(paulo.parts.table.rotation.x) < 0.05;
+// [from, to, offset of the dimension line, shown when]; the label is the measured length
+const DIMS = {
+  outer: [
+    [[BX.x0, rimY, BX.z1], [BX.x1, rimY, BX.z1], [0, 0, 170]],
+    [[BX.x0, rimY, BX.z0], [BX.x0, rimY, BX.z1], [-190, 0, 0]],
+    [[BX.x1, 0, BX.z1], [BX.x1, rimY, BX.z1], [110, 0, 110]],
+    [[BX.x0, BX.base, BX.z1], [BX.x0, BX.top, BX.z1], [-90, 0, 90]],
+    [[-848, 0, 400], [910, 0, 400], [0, 0, 260]],
+    [[-806, 0, -330], [-806, 1330, -330], [-170, 0, 0], shelfOn],
+    [[-806, 1341, -40], [806, 1341, -40], [0, 110, 0], shelfOn],
+    [[806, 1341, -360], [806, 1341, -40], [120, 0, 0], shelfOn],
+    [[-710, 641, 683], [710, 641, 683], [0, 0, 100], tableUp],
+    [[710, 641, 363], [710, 641, 683], [120, 0, 0], tableUp],
+  ],
+  inner: [
+    [[-695, rimY, -200], [695, rimY, -200], [0, 0, 0]],
+    [[HF.cx, rimY, -clearZ], [HF.cx, rimY, clearZ], [0, 0, 0]],
+    [[-HF.cx - HF.w / 2, rimY, 200], [-HF.cx + HF.w / 2, rimY, 200], [0, 0, 0]],
+    [[690, floorTop, 0], [690, rimY, 0], [0, 0, 0]],
+    [[-200, floorTop, 60], [200, floorTop, 60], [0, 0, 60]],
+    [[200, floorTop, -60], [200, floorTop, 60], [60, 0, 0]],
+  ],
+};
+const dimMat = new LineMaterial({ color: 0x1463c2, linewidth: 1.6, depthTest: false, transparent: true });
+const dimSets = {};
+for (const [key, list] of Object.entries(DIMS)) {
+  const pos = [], labels = [];
+  const grp = new THREE.Group();
+  for (const [a, b, off, when] of list) {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), O = new THREE.Vector3(...off);
+    const dir = B.clone().sub(A).normalize();
+    // end caps follow the offset; with no offset, any direction square to the line
+    const cap = O.lengthSq() ? O.clone().normalize() : new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0)).normalize();
+    const P = A.clone().add(O), Q = B.clone().add(O), c = cap.multiplyScalar(22);
+    const segs = [P, Q, P.clone().sub(c), P.clone().add(c), Q.clone().sub(c), Q.clone().add(c)];
+    if (O.lengthSq()) segs.push(A, P, B, Q);
+    const first = pos.length / 6;
+    for (const v of segs) pos.push(v.x / 1000, v.y / 1000, v.z / 1000);
+    const div = document.createElement('div');
+    div.className = 'dim';
+    div.textContent = `${Math.round(A.distanceTo(B))} mm`;
+    app.append(div);
+    labels.push({ div, at: P.clone().add(Q).multiplyScalar(0.0005), when, first, count: segs.length / 2 });
+  }
+  const geo = new LineSegmentsGeometry().setPositions(pos);
+  const lines = new LineSegments2(geo, dimMat);
+  lines.renderOrder = 10; lines.frustumCulled = false;
+  grp.add(lines);
+  scene.add(grp);
+  dimSets[key] = { grp, labels, geo, pos, on: false };
+}
+function setDims(key, on) {
+  const d = dimSets[key];
+  d.on = on; d.grp.visible = on;
+  if (!on) for (const l of d.labels) l.div.style.display = 'none';
+}
+const dimPt = new THREE.Vector3();
+function placeDims() {
+  const w = app.clientWidth, h = app.clientHeight;
+  for (const d of Object.values(dimSets)) {
+    if (!d.on) continue;
+    let dirty = false;
+    for (const l of d.labels) {
+      const show = !l.when || l.when();
+      if (show !== (l.shown ?? true)) {   // collapse the lines of a dimension whose part is away
+        l.shown = show; dirty = true;
+        const arr = d.geo.attributes.instanceStart.data.array;
+        for (let i = l.first * 6; i < (l.first + l.count) * 6; i++) arr[i] = show ? d.pos[i] : 0;
+      }
+      dimPt.copy(l.at).project(camera);
+      const vis = show && dimPt.z < 1;
+      l.div.style.display = vis ? '' : 'none';
+      if (vis) l.div.style.transform = `translate(-50%, -50%) translate(${((dimPt.x + 1) / 2) * w}px, ${((1 - dimPt.y) / 2) * h}px)`;
+    }
+    if (dirty) d.geo.attributes.instanceStart.data.needsUpdate = true;
+  }
+}
+
 // ------------------------------------------------------------- views
 const VIEWS = {
   'Front ¾': [2.2, 1.8, 3.4],
@@ -75,7 +161,7 @@ const el = (tag, attrs = {}, ...kids) => {
   e.append(...kids);
   return e;
 };
-const section = (title) => { const s = el('section', {}, el('h3', {}, title)); ui.append(s); return s; };
+const section = (title) => { const s = el('section', {}, el('h3', {}, t(title))); ui.append(s); return s; };
 const seg = (cls = 'seg wrap') => el('div', { class: cls });
 
 const boxes = {}, sliders = {}, selects = {};
@@ -89,23 +175,36 @@ function sync(st) {
   sliders.boom.value = st.boom; sliders.press.value = st.press * 100;
 }
 
+document.documentElement.lang = lang;
+document.title = t('Paulo Braai XL: 3D concept');
+document.getElementById('sub').textContent = t('Lidded oven concept · drag to orbit, pinch or scroll to zoom, tap a part to name it');
+document.getElementById('specs').innerHTML = `${t('Braai box')} <b>1520 × 720 mm</b> · ${t('cooking area')} <b>1390 × 658 mm</b>, ${t('two halves of')} <b>646 × 640</b> · ${t('surface height')} <b>92 ${t('to')} 292 mm</b> ${t('above the floor')}`;
+
+const langRow = seg('seg');
+for (const [k, name] of [['fr', 'Français'], ['en', 'English']]) {
+  const b = el('button', { onclick: () => { const u = new URL(location.href); u.searchParams.set('lang', k); location.href = u; } }, name);
+  if (k === lang) b.classList.add('on');
+  langRow.append(b);
+}
+section('Language').append(langRow);
+
 const finish0 = params.get('finish') || 'black';
 const finishRow = seg('seg');
 for (const [k, f] of Object.entries(FINISHES)) {
-  const b = el('button', { onclick: () => { paulo.setFinish(k); finishRow.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); } }, f.label);
+  const b = el('button', { onclick: () => { paulo.setFinish(k); finishRow.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); } }, t(f.label));
   if (k === finish0) b.classList.add('on');
   finishRow.append(b);
 }
 section('Finish').append(finishRow);
 
 const presetRow = seg();
-for (const [k, p] of Object.entries(PRESETS)) presetRow.append(el('button', { onclick: () => sync(paulo.applyPreset(k)) }, p.label));
+for (const [k, p] of Object.entries(PRESETS)) presetRow.append(el('button', { onclick: () => sync(paulo.applyPreset(k)) }, t(p.label)));
 section('Setup').append(presetRow);
 
 const sSurf = section('Cooking surfaces and height above the coals');
-for (const [side, name] of [['L', 'Left half'], ['R', 'Right half']]) {
-  const type = el('select', { 'aria-label': `${name} surface` }, ...SURFACES.map((s) => el('option', { value: s.key }, s.label)));
-  const level = el('select', { 'aria-label': `${name} height` }, ...LEVELS.map((l, i) => el('option', { value: i }, l)));
+for (const [side, name] of [['L', t('Left half')], ['R', t('Right half')]]) {
+  const type = el('select', { 'aria-label': `${name}, ${t('surface')}` }, ...SURFACES.map((s) => el('option', { value: s.key }, t(s.label))));
+  const level = el('select', { 'aria-label': `${name}, ${t('height')}` }, ...LEVELS.map((l, i) => el('option', { value: i }, l.replace('(closest)', t('(closest)')))));
   const apply = () => {
     const slots = paulo.setSlot(side, type.value, +level.value);
     for (const s of ['L', 'R']) selects[s].type.value = slots[s][0];
@@ -116,8 +215,8 @@ for (const [side, name] of [['L', 'Left half'], ['R', 'Right half']]) {
 }
 
 const sSpit = section('Rotisseries (full length, or half with a grill beside)');
-selects.spit = ['Back spit', 'Front spit'].map((name, i) => {
-  const sel = el('select', { 'aria-label': name }, ...SPIT_MODES.map((m) => el('option', { value: m.key }, m.label)));
+selects.spit = [t('Back spit'), t('Front spit')].map((name, i) => {
+  const sel = el('select', { 'aria-label': name }, ...SPIT_MODES.map((m) => el('option', { value: m.key }, t(m.label))));
   sel.addEventListener('change', () => paulo.setSpit(i, sel.value));
   sSpit.append(el('div', { class: 'slot two' }, el('span', {}, name), sel));
   return sel;
@@ -129,7 +228,8 @@ const moveLid = (side, v) => {
   if (v < 100 && boxes.shelf.checked) { boxes.shelf.checked = false; paulo.setVisible('shelf', false); }
   paulo.setLid(side, v / 100);
 };
-const range = (key, label, min, max, fn) => {
+const range = (key, en, min, max, fn) => {
+  const label = t(en);
   const r = el('input', { type: 'range', min, max, step: 1, 'aria-label': label, oninput: (e) => fn(+e.target.value) });
   sliders[key] = r;
   return el('label', { class: 'range' }, el('span', {}, label), r);
@@ -144,8 +244,8 @@ sMove.append(
   range('ashDrawer', 'Ash drawer: in ↔ out', 0, 100, (v) => paulo.setAshDrawer(v / 100)),
   range('table', 'Table: folded ↔ up', 0, 100, (v) => paulo.setTableOpen(v / 100)),
   range('boom', 'Swing potjie boom', -180, 180, (v) => paulo.setBoomAngle((v * Math.PI) / 180)),
-  el('label', {}, el('input', { type: 'checkbox', checked: '', onchange: (e) => (spin = e.target.checked) }), 'Turn the rotisseries'),
-  el('label', {}, el('input', { type: 'checkbox', onchange: (e) => paulo.setBricks(!e.target.checked) }), 'Hide the firebricks (show how things are fixed)'),
+  el('label', {}, el('input', { type: 'checkbox', checked: '', onchange: (e) => (spin = e.target.checked) }), t('Turn the rotisseries')),
+  el('label', {}, el('input', { type: 'checkbox', onchange: (e) => paulo.setBricks(!e.target.checked) }), t('Hide the firebricks (show how things are fixed)')),
 );
 
 sliders.ashGate.value = +(params.get('gate') || 0); sliders.ashDrawer.value = +(params.get('drawer') || 0);
@@ -162,15 +262,50 @@ for (const { key, label } of ACCESSORIES) {
     },
   });
   boxes[key] = cb;
-  list.append(el('label', {}, cb, label));
+  list.append(el('label', {}, cb, t(label)));
 }
 section('Accessories').append(list);
 
 const viewRow = seg();
-for (const k of Object.keys(VIEWS)) viewRow.append(el('button', { onclick: () => goView(k) }, k));
+for (const k of Object.keys(VIEWS)) viewRow.append(el('button', { onclick: () => goView(k) }, t(k)));
 let autoRotate = false;
-viewRow.append(el('button', { onclick: (e) => { autoRotate = !autoRotate; e.target.classList.toggle('on', autoRotate); } }, 'Auto-rotate'));
+viewRow.append(el('button', { onclick: (e) => { autoRotate = !autoRotate; e.target.classList.toggle('on', autoRotate); } }, t('Auto-rotate')));
 section('View').append(viewRow);
+
+const sDim = section('Dimensions');
+const dimBoxes = {};
+for (const [key, label, on] of [['outer', 'Outside dimensions', true], ['inner', 'Inside dimensions', false]]) {
+  const want = params.has('dims') ? ['all', key].includes(params.get('dims')) : on;
+  const cb = el('input', { type: 'checkbox', onchange: (e) => setDims(key, e.target.checked) });
+  cb.checked = want; setDims(key, want);
+  dimBoxes[key] = cb;
+  sDim.append(el('label', {}, cb, t(label)));
+}
+const H = LEVELS.map((l) => parseInt(l, 10)).join(' · ');
+const rows = [
+  ['Braai box, outside (L × W × H)', '1520 × 720 × 360'],
+  ['Rim height above the ground', '1006'],
+  ['Cooking area inside the bricks', '1390 × 658'],
+  ['Depth from brick floor to rim', '330'],
+  ['Half surface (grid, plancha, press)', '646 × 640'],
+  ['Cooking height above the floor', H],
+  ['Each half lid (length × height)', '758 × 260'],
+  ['Upper shelf (L × W), deck height', `1612 × 320, ${t('at')} 1330`],
+  ['Fold-up table (L × W), height', `1420 × 320, ${t('at')} 640`],
+  ['Mobile firebox (L × W × H)', '484 × 294 × 219'],
+  ['Ash slot in the floor', '400 × 120'],
+  ['Ash drawer (W × D × H)', '428 × 480 × 98'],
+  ['Spit axes: spacing, height above rim', `330 ${t('apart')}, 70 ${t('up')}`],
+  ['Wheel diameter', '296'],
+  ['Overall, cart with handles (L × W)', '1758 × 810'],
+  ['Overall, lids open and table up (D × H)', '1523 × 1810'],
+  ['Overall length with the boom swung out', '2018'],
+  ['Under the cover (L × W × H)', '1803 × 1153 × 1482'],
+];
+sDim.append(
+  el('table', { class: 'dims' }, ...rows.map(([k, v]) => el('tr', {}, el('th', { scope: 'row' }, t(k)), el('td', {}, v)))),
+  el('p', { class: 'note' }, t('All sizes in millimetres (10 mm = 1 cm).')),
+);
 
 section('Export').append(el('button', {
   class: 'primary', onclick: async () => {
@@ -180,7 +315,7 @@ section('Export').append(el('button', {
     const glb = await new GLTFExporter().parseAsync(clone, { binary: true });
     el('a', { href: URL.createObjectURL(new Blob([glb], { type: 'model/gltf-binary' })), download: 'paulo-braai-xl.glb' }).click();
   },
-}, 'Download current setup (.glb)'));
+}, t('Download current setup (.glb)')));
 
 if (params.get('bricks') === '0') paulo.setBricks(false);
 sync(paulo.applyPreset(PRESETS[params.get('preset')] ? params.get('preset') : 'showcase'));
@@ -196,7 +331,7 @@ function pick(e) {
   ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObject(paulo.root, true).find((h) => visibleUp(h.object));
   if (!hit) { tip.style.opacity = 0; return; }
-  tip.textContent = hit.object.name.split(':')[0];
+  tip.textContent = t(hit.object.name.split(':')[0]);
   const x = Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 8);
   tip.style.transform = `translate(${x}px, ${e.clientY - r.top + 14}px)`;
   tip.style.opacity = 1;
@@ -239,5 +374,6 @@ renderer.setAnimationLoop(() => {
   }
   controls.update();
   renderer.render(scene, camera);
+  placeDims();
 });
 window.__paulo = paulo;

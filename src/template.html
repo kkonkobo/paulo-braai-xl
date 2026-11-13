@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#dcdfe2">
-<title>Paulo Braai XL: 3D concept</title>
+<title>Paulo Braai XL</title>
 <style>
   :root { --ink: #1d1c1a; --muted: #62676c; --line: #d5d8db; --panel: #f3f4f5; --accent: #c4622d; }
   * { box-sizing: border-box; }
@@ -18,6 +18,12 @@
   .specs { position: absolute; left: 20px; right: 20px; bottom: 14px; color: var(--muted); font-size: 12px; pointer-events: none; }
   .specs b { color: var(--ink); font-weight: 600; }
   #tip { position: absolute; left: 0; top: 0; padding: 4px 8px; background: var(--ink); color: #fff; border-radius: 4px; font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .12s; white-space: nowrap; }
+  .dim { position: absolute; left: 0; top: 0; padding: 1px 6px; background: #fff; color: #0f4f9e; border: 1px solid #1463c2; border-radius: 4px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
+  table.dims { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  table.dims th, table.dims td { padding: 5px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  table.dims th { text-align: left; font-weight: 400; color: var(--muted); padding-right: 10px; }
+  table.dims td { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
   #ui { min-width: 0; background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 16px calc(24px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
   section { padding: 10px 0 12px; border-bottom: 1px solid var(--line); }
   section:last-child { border: 0; }
@@ -28,7 +34,7 @@
   button:hover { border-color: #aeb3b8; }
   button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
   button.primary { width: 100%; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 9px; }
-  .slot { display: grid; grid-template-columns: 62px 1fr 118px; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .slot { display: grid; grid-template-columns: 56px 1fr 96px; gap: 6px; align-items: center; margin-bottom: 6px; }
   .slot span { color: var(--muted); }
   .slot.two { grid-template-columns: 76px 1fr; }
   .slot select { min-width: 0; width: 100%; }
@@ -49,7 +55,7 @@
     .specs { left: 14px; bottom: 8px; }
     button, select { padding: 9px 12px; }
     .list { gap: 10px; }
-    .slot { grid-template-columns: 70px 1fr 136px; }
+    .slot { grid-template-columns: 64px 1fr 112px; }
     input[type=checkbox] { width: 18px; height: 18px; }
     label.range { margin-bottom: 14px; }
   }
@@ -58,8 +64,8 @@
 <body>
 <div class="shell">
   <div id="app">
-    <header><h1>Paulo Braai XL</h1><p>Lidded oven concept · drag to orbit, pinch or scroll to zoom, tap a part to name it</p></header>
-    <div class="specs">Braai box <b>1520 × 720 mm</b> · cooking area <b>1390 × 658 mm</b>, two halves of <b>646 × 640</b> · surface height <b>92 to 292 mm</b> above the floor</div>
+    <header><h1>Paulo Braai XL</h1><p id="sub"></p></header>
+    <div class="specs" id="specs"></div>
     <div id="tip"></div>
   </div>
   <aside id="ui"></aside>
