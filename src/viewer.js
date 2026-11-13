@@ -25,7 +25,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 0.85, -0.05);
 controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 0.6;
+controls.minDistance = 0.25;
 controls.maxDistance = 9;
 
 const sun = new THREE.DirectionalLight(0xfff4e6, 2.2);
@@ -56,12 +56,15 @@ const VIEWS = {
   Inside: [0.5, 2.6, 1.7],
   Back: [-0.9, 1.6, -3.4],
   Top: [0, 4.4, 0.5],
-  'Motor mount': [2.3, 1.5, 0.5],
-  'Spit bridge': [-0.25, 1.75, 1.05],
+  'Motor mount': [1.75, 1.3, 0.75, 0.8, 1.0, -0.05],
+  'Spit bridge': [-0.45, 1.5, 0.75, 0, 1.0, -0.1],
+  'Rack hangers': [0.12, 1.24, 0.3, -0.2, 0.97, -0.34],   // close-ups carry their own look-at point
 };
 let tween = null;
-const goView = (name) => { tween = { from: camera.position.clone(), to: new THREE.Vector3(...VIEWS[name]), t: 0 }; };
-camera.position.set(...(VIEWS[params.get('view')] || VIEWS['Front ¾']));
+const HOME = new THREE.Vector3(0, 0.85, -0.05);
+const viewTarget = (name) => (VIEWS[name].length > 3 ? new THREE.Vector3(...VIEWS[name].slice(3)) : HOME.clone());
+const goView = (name) => { tween = { from: camera.position.clone(), to: new THREE.Vector3(...VIEWS[name].slice(0, 3)), t: 0, tFrom: controls.target.clone(), tTo: viewTarget(name) }; };
+{ const v0 = VIEWS[params.get('view')] ? params.get('view') : 'Front ¾'; camera.position.set(...VIEWS[v0].slice(0, 3)); controls.target.copy(viewTarget(v0)); }
 
 // ------------------------------------------------------------- UI
 const ui = document.getElementById('ui');
@@ -221,6 +224,7 @@ renderer.setAnimationLoop(() => {
     tween.t = Math.min(1, tween.t + dt * 1.6);
     const k = tween.t * tween.t * (3 - 2 * tween.t);
     camera.position.lerpVectors(tween.from, tween.to, k);
+    controls.target.lerpVectors(tween.tFrom, tween.tTo, k);
     if (tween.t >= 1) tween = null;
   }
   if (autoRotate) {

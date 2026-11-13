@@ -160,6 +160,8 @@ function braaiBox(M) {
     for (const xs of [-1, 1]) B.add('zinc', bmm(xs * 15, xs * 20, top - 54, top + 6, zs * cz, zs * (cz - 32)));
     // back plate, welded along its top to the inner edge of the rim like the racks
     B.add('zinc', bmm(-20, 20, top - 54, top + 6, zs * cz, zs * (cz - 5)));
+    B.add('zinc', bmm(-20, 20, top + 6, top + 11, zs * (cz - 5), zs * (cz + 24)));   // hanger tab over the rim
+    for (const xs of [-1, 1]) { const bolt = new THREE.CylinderGeometry(6, 6, 2, 12); bolt.translate(xs * 10, top + 12, zs * (cz + 13)); B.add('castiron', bolt); }
   }
   // square receiver sockets on both end walls, one per spit: the motor and roller
   // brackets drop in on a square tongue
@@ -173,13 +175,21 @@ function braaiBox(M) {
   for (const sgn of [-1, 1]) B.add('frame', bmm(sgn * 760, sgn * 812, 770, top, -357, -303));
 
   // Height adjustment with no moving parts: notched comb plates on the front and back
-  // walls. Nothing passes through the lining: each plate is welded along its top to the
-  // inner edge of the steel rim, hangs flat against the brick face and stands on the floor. A surface's four pins drop down the open channel, then the surface slides
+  // walls. Nothing passes through the lining: each plate hooks over the steel rim (see the
+  // hanger fingers below), hangs flat against the brick face and stands on the floor. A surface's four pins drop down the open channel, then the surface slides
   // 26 mm sideways so the pins sit in the notches at the chosen height.
   for (const hs of [-1, 1]) for (const px of [-1, 1]) for (const zs of [-1, 1]) {
     const g = new THREE.ExtrudeGeometry(combShape(hs), { depth: 6, bevelEnabled: false });
     g.translate(hs * DIM.half.cx + px * DIM.half.pinX, COMB.y0, zs > 0 ? cz - 6 : -cz);
     B.add('zinc', g);
+    // the hanger: two fingers bent over the top of the wall and bolted down onto the steel
+    // rim, either side of the open channel. This is all that holds the rack up.
+    const xr = hs * DIM.half.cx + px * DIM.half.pinX;
+    for (const [a, b] of [[-22, 18], [34, 48]]) {
+      B.add('zinc', bmm(xr + hs * a, xr + hs * b, DIM.rimY, DIM.rimY + 5, zs * (cz - 6), zs * (cz + 24)));
+      const bolt = new THREE.CylinderGeometry(6, 6, 2, 12); bolt.translate(xr + hs * (a + b) / 2, DIM.rimY + 6, zs * (cz + 13));
+      B.add('castiron', bolt);
+    }
   }
   return B.build(M);
 }
