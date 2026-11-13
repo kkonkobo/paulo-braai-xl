@@ -150,6 +150,8 @@ function braaiBox(M) {
   brickWall(B, 2 * inX, top - ft, mx(TR(0, ft, z1 - t, 0, PI, 0)));                                          // front
   for (const sgn of [-1, 1]) brickWall(B, 2 * cz, top - ft, mx(TR(sgn * inX, ft, 0, 0, -sgn * PI / 2, 0))); // ends
 
+  // saddles the centre spit bridge hangs in
+  for (const zs of [-1, 1]) B.add('zinc', bmm(-16, 16, top - 62, top - 50, zs * cz, zs * (cz - 24)));
   // sockets for the removable upper shelf, outside the back corners
   for (const sgn of [-1, 1]) B.add('frame', bmm(sgn * 760, sgn * 812, 770, top, -357, -303));
 
@@ -537,34 +539,68 @@ function sandwichPress(M) {
   return grp;
 }
 
-function rotisserie(M, i) {
-  // Self-contained unit: the motor bracket hangs on two studs on the right end wall,
-  // the roller bracket on the left; lift both off and the spit comes with them.
+function rotisserieVariant(M, i, mode) {
+  // mode 'full': motor on the right end wall, roller bracket on the left.
+  // mode 'L' / 'R': motor on that end wall, the short spit rests on the centre bridge.
   const grp = new THREE.Group(); grp.name = `Rotisserie ${i + 1}`;
-  const z = DIM.spitZ[i], y = DIM.spitY, { x0, x1, top } = DIM.box;
-  const K = new Part(`Rotisserie ${i + 1}: motor and roller brackets`);
-  K.add('zinc', bmm(x1, x1 + 6, top - 130, y + 28, z - 48, z + 48));
-  K.add('plastic', box(72, 130, 112, x1 + 44, y - 18, z));
-  K.add('plastic', box(76, 18, 116, x1 + 44, y + 40, z));
-  K.add('zinc', bmm(x0 - 6, x0, top - 130, y - 4, z - 42, z + 42));
-  for (const dz of [-30, 30]) for (const [xa, xb] of [[x1, x1 + 12], [x0 - 12, x0]]) K.add('zinc', rod(V(xa, top - 100, z + dz), V(xb, top - 100, z + dz), 7));
-  for (const dz of [-16, 16]) K.add('zinc', rod(V(x0 - 16, y - 9, z + dz), V(x0 + 2, y - 9, z + dz), 11, 14));
+  const z = DIM.spitZ[i], y = DIM.spitY, { x1, top } = DIM.box;
+  const sgn = mode === 'L' ? -1 : 1, xm = sgn * x1, half = mode !== 'full';
+  const K = new Part(`Rotisserie ${i + 1}: motor${half ? '' : ' and roller'} bracket`);
+  K.add('zinc', bmm(xm, xm + sgn * 6, top - 130, y + 28, z - 48, z + 48));
+  K.add('plastic', box(72, 130, 112, xm + sgn * 44, y - 18, z));
+  K.add('plastic', box(76, 18, 116, xm + sgn * 44, y + 40, z));
+  for (const dz of [-30, 30]) K.add('zinc', rod(V(xm, top - 100, z + dz), V(xm + sgn * 12, top - 100, z + dz), 7));
+  if (!half) {
+    K.add('zinc', bmm(-xm - sgn * 6, -xm, top - 130, y - 4, z - 42, z + 42));
+    for (const dz of [-30, 30]) K.add('zinc', rod(V(-xm - sgn * 12, top - 100, z + dz), V(-xm, top - 100, z + dz), 7));
+    for (const dz of [-16, 16]) K.add('zinc', rod(V(-xm - sgn * 16, y - 9, z + dz), V(-xm + sgn * 2, y - 9, z + dz), 11, 14));
+  }
   grp.add(K.build(M));
   const spit = new THREE.Group(); spit.name = `Spit rod ${i + 1}`;
-  const S = new Part(`Spit rod ${i + 1}`);
-  S.add('stainless', box(1650, 10, 10, -25, 0, 0));
-  S.add('wood', rod(V(-950, 0, 0), V(-850, 0, 0), 14, 16));
-  for (const [fx, dirn] of [[-520, 1], [-190, -1], [190, 1], [520, -1]]) {
+  const S = new Part(half ? `Half-length spit rod ${i + 1}` : `Spit rod ${i + 1}`);
+  let forks;
+  if (half) {
+    S.add('stainless', box(845, 10, 10, sgn * 377.5, 0, 0));          // motor to just past the centre bridge
+    S.add('stainless', rod(V(-sgn * 45, -20, 0), V(-sgn * 45, 20, 0), 5));
+    forks = [[sgn * 150, sgn], [sgn * 600, -sgn]];
+  } else {
+    S.add('stainless', box(1650, 10, 10, -sgn * 25, 0, 0));
+    S.add('wood', rod(V(-sgn * 950, 0, 0), V(-sgn * 850, 0, 0), 14, 16));
+    forks = [[-520, 1], [-190, -1], [190, 1], [520, -1]];
+  }
+  for (const [fx, dirn] of forks) {
     S.add('stainless', box(40, 26, 26, fx, 0, 0));
     S.add('stainless', rod(V(fx, 13, 0), V(fx, 40, 0), 4));
     S.add('stainless', rod(V(fx - 15, 40, 0), V(fx + 15, 40, 0), 4));
-    for (const s of [-1, 1]) S.add('stainless', bentRod([V(fx, 0, s * 8), V(fx + dirn * 30, 0, s * 26), V(fx + dirn * 150, 0, s * 26)], 3));
+    for (const k of [-1, 1]) S.add('stainless', bentRod([V(fx, 0, k * 8), V(fx + dirn * 30, 0, k * 26), V(fx + dirn * 150, 0, k * 26)], 3));
   }
   spit.add(S.build(M));
   spit.position.set(0, y, z);
   grp.add(spit);
   grp.userData.spit = spit;
   return grp;
+}
+
+function rotisserie(M, i) {
+  const grp = new THREE.Group(); grp.name = `Rotisserie ${i + 1}`;
+  grp.userData.variants = Object.fromEntries(['full', 'L', 'R'].map((m) => [m, rotisserieVariant(M, i, m)]));
+  grp.add(...Object.values(grp.userData.variants));
+  return grp;
+}
+
+function spitBridge(M) {
+  // Drop-in centre support for half-length spits: a bar across the middle of the box,
+  // hung in two saddles just under the rim (so the lids still close), with a roller
+  // cradle for each spit.
+  const B = new Part('Centre spit bridge (drop-in)');
+  const cz = DIM.clearZ, y = DIM.spitY, top = DIM.box.top;
+  B.add('frame', bmm(-4, 4, top - 50, top - 4, -cz + 2, cz - 2));
+  for (const z of DIM.spitZ) {
+    B.add('frame', bmm(-4, 4, top - 4, y - 8, z - 22, z + 22));
+    for (const dz of [-16, 16]) B.add('zinc', rod(V(-9, y - 9, z + dz), V(9, y - 9, z + dz), 11, 14));
+  }
+  B.add('frame', bentRod([V(0, top - 4, -45), V(0, top + 40, -45), V(0, top + 40, 45), V(0, top - 4, 45)], 5));
+  return B.build(M);
 }
 
 function upperShelf(M) {
@@ -574,10 +610,12 @@ function upperShelf(M) {
   const y = 1330;
   for (const sgn of [-1, 1]) B.add('frame', sq(V(sgn * 786, 785, -330), V(sgn * 786, y - 4, -330), 40));
   B.add('frame', sq(V(-806, y - 20, -330), V(806, y - 20, -330), 40, 40));
-  const p = meshPanel(1612, 210, { bar: 22, barT: 5 });
-  B.add('frame', p.frame.translate(0, y, -255));
-  B.add('frame', p.mesh.translate(0, y, -255));
-  B.add('frame', rebar(V(-806, y + 4, -146), V(806, y + 4, -146), 6));
+  // deck runs from just in front of the open lids to just short of the potjie chain
+  const p = meshPanel(1612, 320, { bar: 22, barT: 5 });
+  B.add('frame', p.frame.translate(0, y, -200));
+  B.add('frame', p.mesh.translate(0, y, -200));
+  for (const x of [-786, 0, 786]) B.add('frame', sq(V(x, y - 20, -310), V(x, y - 20, -45), 20, 30));   // arms under the overhang
+  B.add('frame', rebar(V(-806, y + 4, -36), V(806, y + 4, -36), 6));
   return B.build(M);
 }
 
@@ -700,6 +738,7 @@ export const SURFACES = [
   { key: 'press', label: 'Sandwich press' },
 ];
 // label = height of the cooking surface above the brick floor the coals lie on
+export const SPIT_MODES = [{ key: 'off', label: 'Off' }, { key: 'full', label: 'Full length' }, { key: 'L', label: 'Left half' }, { key: 'R', label: 'Right half' }];
 export const LEVELS = DIM.rails.map((y, i) => `${y + 22 - DIM.floorTop} mm${i === 0 ? ' (closest)' : ''}`);
 
 export const ACCESSORIES = [
@@ -729,6 +768,7 @@ export const PRESETS = {
   grill: { label: 'Twin grids', on: BASE, slots: { L: ['barGrid', 3], R: ['vGrid', 3] } },
   flat: { label: 'Plancha + press', on: BASE, slots: { L: ['plancha', 3], R: ['press', 3] } },
   spit: { label: 'Double rotisserie', on: [...BASE, 'rot1', 'rot2'] },
+  spitGrill: { label: 'Half spits + grill', on: [...BASE, 'rot1', 'rot2'], spits: ['R', 'R'], slots: { L: ['barGrid', 2] }, firebox: 345 },
   potjie: { label: 'Potjie & ribs', on: [...BASE, 'potjie', 'ribStand', 'breadClamp', 'lidHolder'], firebox: 426, boom: 0 },
   oven: { label: 'Oven (lids closed)', on: NOSHELF, slots: { L: ['barGrid', 3], R: ['vGrid', 3] }, lids: [0, 0] },
   halfOven: { label: 'Half oven', on: NOSHELF, slots: { L: ['barGrid', 3], R: ['plancha', 3] }, lids: [0, 1], firebox: -347 },
@@ -757,6 +797,12 @@ export function buildPaulo({ finish = 'raw' } = {}) {
   put('firebox', fireboxSled(M));
   put('rot1', rotisserie(M, 0));
   put('rot2', rotisserie(M, 1));
+  const bridge = spitBridge(M); root.add(bridge);
+  const spitMode = ['full', 'full'];
+  const placeSpits = () => {
+    ['rot1', 'rot2'].forEach((k, i) => { for (const [m, g] of Object.entries(parts[k].userData.variants)) g.visible = m === spitMode[i]; });
+    bridge.visible = ['rot1', 'rot2'].some((k, i) => parts[k].visible && spitMode[i] !== 'full');
+  };
   const boom = potjieBoom(M);
   boom.position.set(DIM.box.x1 + 26, 0, 0);
   put('boom', boom);
@@ -797,6 +843,13 @@ export function buildPaulo({ finish = 'raw' } = {}) {
       if (!parts[key]) return;
       parts[key].visible = v;
       if (key === 'boom' && !v) parts.potjie.visible = false;
+      placeSpits();
+    },
+    // each rotisserie: 'off', 'full', or a half-length spit on the left ('L') or right ('R')
+    setSpit(i, mode) {
+      parts['rot' + (i + 1)].visible = mode !== 'off';
+      if (mode !== 'off') spitMode[i] = mode;
+      placeSpits();
     },
     // put a surface in the left or right half; a surface exists once, so it moves if already placed
     setSlot(side, type, lvl = slots[side][1]) {
@@ -813,17 +866,19 @@ export function buildPaulo({ finish = 'raw' } = {}) {
       slots.L = [...(p.slots?.L ?? ['none', 3])];
       slots.R = [...(p.slots?.R ?? ['none', 3])];
       placeSlots();
+      spitMode[0] = p.spits?.[0] ?? 'full'; spitMode[1] = p.spits?.[1] ?? 'full';
+      placeSpits();
       const st = { tableOpen: p.tableOpen ?? 1, lidL: p.lids?.[0] ?? 1, lidR: p.lids?.[1] ?? 1, firebox: p.firebox ?? 0, boom: p.boom ?? 180, press: 0.4 };
       api.setTableOpen(st.tableOpen); api.setLid('L', st.lidL); api.setLid('R', st.lidR);
       api.setFirebox(st.firebox); api.setBoomAngle((st.boom * PI) / 180); api.setPress(st.press);
-      return { ...st, vis: Object.fromEntries(ACCESSORIES.map(({ key }) => [key, parts[key].visible])), slots: { L: [...slots.L], R: [...slots.R] } };
+      return { ...st, vis: Object.fromEntries(ACCESSORIES.map(({ key }) => [key, parts[key].visible])), slots: { L: [...slots.L], R: [...slots.R] }, spits: ['rot1', 'rot2'].map((k, i) => (parts[k].visible ? spitMode[i] : 'off')) };
     },
     setTableOpen: (f) => { parts.table.rotation.x = (1 - f) * (PI / 2); },   // 0 folded, 1 up
     setLid: (side, f) => { (side === 'L' ? lidL : lidR).rotation.x = -f * (100 * PI) / 180; },  // 0 closed, 1 open
     setFirebox: (x) => { parts.firebox.position.x = x; },                    // mm along the floor
     setPress: (f) => { surf.press.userData.top.rotation.x = -f * (75 * PI) / 180; },
     setBoomAngle: (a) => { parts.boom.rotation.y = a; },                     // 0 = over the fire
-    spin: (dt) => { for (const k of ['rot1', 'rot2']) parts[k].userData.spit.rotation.x += dt * 1.2; },
+    spin: (dt) => { for (const k of ['rot1', 'rot2']) for (const g of Object.values(parts[k].userData.variants)) g.userData.spit.rotation.x += dt * 1.2; },
   };
   api.applyPreset('showcase');
   return api;

@@ -32,3 +32,4 @@ async function exportVariant(file, { finish, preset }) {
 await exportVariant('docs/paulo-xl-showcase-black.glb', { finish: 'black', preset: 'showcase' });
 await exportVariant('docs/paulo-xl-oven-closed-black.glb', { finish: 'black', preset: 'oven' });
 await exportVariant('docs/paulo-xl-double-rotisserie-raw.glb', { finish: 'raw', preset: 'spit' });
+await exportVariant('docs/paulo-xl-half-spits-and-grill-black.glb', { finish: 'black', preset: 'spitGrill' });

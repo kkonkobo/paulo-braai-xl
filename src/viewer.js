@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { buildPaulo, ACCESSORIES, PRESETS, FINISHES, SURFACES, LEVELS } from './model.js';
+import { buildPaulo, ACCESSORIES, PRESETS, FINISHES, SURFACES, LEVELS, SPIT_MODES } from './model.js';
 
 const app = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -75,7 +75,8 @@ const seg = (cls = 'seg wrap') => el('div', { class: cls });
 const boxes = {}, sliders = {}, selects = {};
 // push model state (from a preset) back into the controls
 function sync(st) {
-  for (const [k, v] of Object.entries(st.vis)) boxes[k].checked = v;
+  for (const [k, v] of Object.entries(st.vis)) if (boxes[k]) boxes[k].checked = v;
+  st.spits.forEach((m, i) => (selects.spit[i].value = m));
   for (const side of ['L', 'R']) { selects[side].type.value = st.slots[side][0]; selects[side].level.value = st.slots[side][1]; }
   sliders.lidL.value = st.lidL * 100; sliders.lidR.value = st.lidR * 100;
   sliders.table.value = st.tableOpen * 100; sliders.firebox.value = st.firebox;
@@ -108,6 +109,14 @@ for (const [side, name] of [['L', 'Left half'], ['R', 'Right half']]) {
   sSurf.append(el('div', { class: 'slot' }, el('span', {}, name), type, level));
 }
 
+const sSpit = section('Rotisseries (full length, or half with a grill beside)');
+selects.spit = ['Back spit', 'Front spit'].map((name, i) => {
+  const sel = el('select', { 'aria-label': name }, ...SPIT_MODES.map((m) => el('option', { value: m.key }, m.label)));
+  sel.addEventListener('change', () => paulo.setSpit(i, sel.value));
+  sSpit.append(el('div', { class: 'slot two' }, el('span', {}, name), sel));
+  return sel;
+});
+
 const sMove = section('Move parts');
 // the upper shelf sits in the lids' swing path: it lifts off before a lid moves
 const moveLid = (side, v) => {
@@ -132,6 +141,7 @@ sMove.append(
 
 const list = el('div', { class: 'list' });
 for (const { key, label } of ACCESSORIES) {
+  if (key.startsWith('rot')) continue;   // rotisseries have their own selects
   const cb = el('input', {
     type: 'checkbox', onchange: (e) => {
       paulo.setVisible(key, e.target.checked);
